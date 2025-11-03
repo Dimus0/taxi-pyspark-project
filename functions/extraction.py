@@ -11,6 +11,7 @@ trip_schema = StructType([
     StructField("dispatching_base_num", StringType(), True),
     StructField("originating_base_num", StringType(), True),
     StructField("request_datetime", TimestampType(), True),
+    StructField("on_scene_datetime", TimestampType(), True),
     StructField("pickup_datetime", TimestampType(), True),
     StructField("dropoff_datetime", TimestampType(), True),
     StructField("PULocationID", IntegerType(), True),
@@ -24,7 +25,12 @@ trip_schema = StructType([
     StructField("congestion_surcharge", DoubleType(), True),
     StructField("airport_fee", DoubleType(), True),
     StructField("tips", DoubleType(), True),
-    StructField("driver_pay", DoubleType(), True)
+    StructField("driver_pay", DoubleType(), True),
+    StructField("shared_request_flag", StringType(), True),
+    StructField("shared_match_flag", StringType(), True),
+    StructField("access_a_ride_flag", StringType(), True),
+    StructField("wav_request_flag", StringType(), True),
+    StructField("wav_match_flag", StringType(), True)
 ])
 
 # Додаткові таблиці
@@ -36,14 +42,28 @@ vehicle_schema = StructType([
     StructField("hvfhs_license_num", StringType(), True)
 ])
 
-zone_schema = StructType([
-    StructField("zone_id", IntegerType(), True)
-])
+def run_extracion(spark: SparkSession, input_path: str):
 
-def run_extracion(spark: SparkSession,input_path: str):
-    
     path = Path(input_path)
-    if not path.exists():
-        raise FileNotFoundError(f"File not found {input_path}")
+    if not path.exists() or not path.is_dir():
+        raise FileNotFoundError(f"Директорія не знайдена: {input_path}")
 
-    pass
+    parquet_files = sorted(path.glob("*.parquet"))
+    if not parquet_files:
+        raise FileNotFoundError(f"У директорії {input_path} немає parquet файлів")
+
+    print(f"Знайдено {len(parquet_files)} parquet файлів. Починаємо зчитування...")
+
+    df_trip = spark.read.schema(trip_schema).parquet(*[str(f) for f in parquet_files])
+
+    print(f"Дані зчитано. Рядків: {df_trip.count()}, колонок: {len(df_trip.columns)}")
+
+    df_base = spark.createDataFrame([], base_schema)
+
+    df_vehicle = df_trip.select("hvfhs_license_num").distinct()
+
+    print("DataFrames успішно створені:")
+    print(f" - df_trip: {df_trip.count()} рядків")
+    print(f" - df_base: {df_base.count()} рядків (порожній)")
+    print(f" - df_vehicle: {df_vehicle.count()} унікальних hvfhs_license_num")
+    # pass
