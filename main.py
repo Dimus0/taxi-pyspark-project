@@ -1,6 +1,7 @@
 import os
 import sys
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
 
 sys.path.append(os.path.join(os.path.dirname(__file__),'funcions'))
 
@@ -16,20 +17,23 @@ except ImportError as e:
 
 def main():
     
-    
-    INPUT_DATA_PATH = ''
+    # Треба зробити щоб зчитувалося із зовнішньої дерикторії всі файли
+    INPUT_DATA_PATH = 'fhvhv_tripdata_2020-04.parquet'
     OUTPUT_RESULT_DIR = ''
 
     print("Iniziliazate SparkSession")
-    spark = SparkSession.builder.appName("Taxi-pyspark-project").getOrCreate()
+    spark = SparkSession.builder \
+        .master("local[*]") \
+        .appName("Taxi-pyspark-project") \
+        .getOrCreate()
 
     try:
         print("\n Запуск Етапу Видобування.....")
 
         df_extracted = run_extracion(spark, INPUT_DATA_PATH)
-        
 
-        print("\n Запуск Етапу Трансформації.....")
+        print("\n Запуск Етапу Трансформації..... В РОЗРОБЦІ")
+
     except Exception as e:
         print(f"Помилка виконання пайплайну: {e}")
 
@@ -42,3 +46,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
