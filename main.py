@@ -18,7 +18,7 @@ except ImportError as e:
 def main():
     
     # Треба зробити щоб зчитувалося із зовнішньої дерикторії всі файли
-    INPUT_DATA_PATH = 'fhvhv_tripdata_2020-04.parquet'
+    INPUT_DATA_PATH = '/app/data'
     OUTPUT_RESULT_DIR = ''
 
     print("Iniziliazate SparkSession")
@@ -30,7 +30,7 @@ def main():
     try:
         print("\n Запуск Етапу Видобування.....")
 
-        df_extracted = run_extracion(spark, INPUT_DATA_PATH)
+        df_trip, df_dispatch_base, df_origin_base, df_vehicle = run_extracion(spark, INPUT_DATA_PATH)
 
         print("\n Запуск Етапу Трансформації..... В РОЗРОБЦІ")
 
