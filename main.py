@@ -30,7 +30,7 @@ def main():
     try:
         print("\n Запуск Етапу Видобування.....")
 
-        df_extracted = run_extracion(spark, INPUT_DATA_PATH)
+        df_trip, df_dispatch_base, df_origin_base, df_vehicle = run_extracion(spark, INPUT_DATA_PATH)
 
         print("\n Запуск Етапу Трансформації..... В РОЗРОБЦІ")
 

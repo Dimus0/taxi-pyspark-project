@@ -14,28 +14,31 @@ trip_schema = StructType([
     StructField("on_scene_datetime", TimestampType(), True),
     StructField("pickup_datetime", TimestampType(), True),
     StructField("dropoff_datetime", TimestampType(), True),
-    StructField("PULocationID", IntegerType(), True),
-    StructField("DOLocationID", IntegerType(), True),
     StructField("trip_miles", DoubleType(), True),
-    StructField("trip_time", IntegerType(), True),
+    StructField("trip_time", LongType(), True),
     StructField("base_passenger_fare", DoubleType(), True),
     StructField("tolls", DoubleType(), True),
     StructField("bcf", DoubleType(), True),
     StructField("sales_tax", DoubleType(), True),
     StructField("congestion_surcharge", DoubleType(), True),
-    StructField("airport_fee", DoubleType(), True),
+    StructField("airport_fee", IntegerType(), True),
     StructField("tips", DoubleType(), True),
     StructField("driver_pay", DoubleType(), True),
     StructField("shared_request_flag", StringType(), True),
     StructField("shared_match_flag", StringType(), True),
     StructField("access_a_ride_flag", StringType(), True),
     StructField("wav_request_flag", StringType(), True),
-    StructField("wav_match_flag", StringType(), True)
+    StructField("wav_match_flag", IntegerType(), True)
 ])
 
 # Додаткові таблиці
-base_schema = StructType([
-    StructField("base_num", StringType(), True)
+dispatch_base_schema = StructType([
+    StructField("dispatch_base_num", StringType(), True)
+])
+
+# Таблиця бази, де поїздка починається
+origin_base_schema = StructType([
+    StructField("origin_base_num", StringType(), True)
 ])
 
 vehicle_schema = StructType([
@@ -58,12 +61,16 @@ def run_extracion(spark: SparkSession, input_path: str):
 
     print(f"Дані зчитано. Рядків: {df_trip.count()}, колонок: {len(df_trip.columns)}")
 
-    df_base = spark.createDataFrame([], base_schema)
+    df_dispatch_base = df_trip.selectExpr("dispatching_base_num as dispatch_base_num").distinct()
+    df_origin_base = df_trip.selectExpr("originating_base_num as origin_base_num").distinct()
 
     df_vehicle = df_trip.select("hvfhs_license_num").distinct()
 
     print("DataFrames успішно створені:")
     print(f" - df_trip: {df_trip.count()} рядків")
-    print(f" - df_base: {df_base.count()} рядків (порожній)")
+    print(f" - df_dispatch_base: {df_dispatch_base.count()} унікальних dispatching_base_num")
+    print(f" - df_origin_base: {df_origin_base.count()} унікальних originating_base_num")
     print(f" - df_vehicle: {df_vehicle.count()} унікальних hvfhs_license_num")
+
+    return df_trip, df_dispatch_base, df_origin_base, df_vehicle
     # pass
