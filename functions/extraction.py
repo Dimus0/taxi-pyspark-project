@@ -1,6 +1,6 @@
 from os import path
 from pyspark.sql.types import DateType, StructType, StructField, StringType, LongType, DoubleType, IntegerType, \
-    TimestampType
+    TimestampType,BinaryType
 from pyspark.sql.functions import col
 from pyspark.sql import SparkSession
 from pathlib import Path
@@ -23,14 +23,14 @@ trip_schema = StructType([
     StructField("bcf", DoubleType(), True),
     StructField("sales_tax", DoubleType(), True),
     StructField("congestion_surcharge", DoubleType(), True),
-    StructField("airport_fee", IntegerType(), True),
+    # StructField("airport_fee", LongType(), True), NULL value in original table
     StructField("tips", DoubleType(), True),
     StructField("driver_pay", DoubleType(), True),
     StructField("shared_request_flag", StringType(), True),
     StructField("shared_match_flag", StringType(), True),
     StructField("access_a_ride_flag", StringType(), True),
     StructField("wav_request_flag", StringType(), True),
-    StructField("wav_match_flag", IntegerType(), True)
+    # StructField("wav_match_flag", BinaryType(), True) NULL value in original table
 ])
 
 # Додаткові таблиці
@@ -49,6 +49,7 @@ vehicle_schema = StructType([
 
 
 def run_extracion(spark: SparkSession, input_path: str):
+
     path = Path(input_path)
     if not path.exists() or not path.is_dir():
         raise FileNotFoundError(f"Директорія не знайдена: {input_path}")
@@ -59,9 +60,25 @@ def run_extracion(spark: SparkSession, input_path: str):
 
     print(f"Знайдено {len(parquet_files)} parquet файлів. Починаємо зчитування...")
 
+    ### Обмеження даних з кожного parquet file по 10к з кожнго це буде 460к
+
     df_trip = spark.read.schema(trip_schema).parquet(*[str(f) for f in parquet_files])
 
-    print(f"Дані зчитано. Рядків: {df_trip.count()}, колонок: {len(df_trip.columns)}")
+    limit_per_file = 10000
+    limited = []
+    for i,f in enumerate(parquet_files, start=1):
+        print(f"[{i}/{len(parquet_files)}] Зчитування {f.name} ...")
+
+        part_of_df = (
+            spark.read.schema(trip_schema).parquet(str(f)).limit(limit_per_file)
+        )
+        limited.append(part_of_df)
+
+    df_trip = limited[0]
+    for df in limited[1:]:
+        df_trip = df_trip.unionByName(df, allowMissingColumns=True)
+
+    print(f"Після об’єднання рядків: {df_trip.count()}, колонок: {len(df_trip.columns)}")
 
     df_dispatch_base = df_trip.selectExpr("dispatching_base_num as dispatch_base_num").distinct()
     df_origin_base = df_trip.selectExpr("originating_base_num as origin_base_num").distinct()
@@ -89,4 +106,5 @@ def run_extracion(spark: SparkSession, input_path: str):
     df_dispatch_base.printSchema()
     df_origin_base.printSchema()
     df_vehicle.printSchema()
+
     return df_trip, df_dispatch_base, df_origin_base, df_vehicle
