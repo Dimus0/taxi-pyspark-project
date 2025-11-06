@@ -27,9 +27,9 @@ def analyze_dataset(df_trip: DataFrame):
 
     # Перевірка на пропущені значення (NaN/null)
     print("\nКількість пропущених значень у кожній колонці:")
-    df_sample.select([
-        count(when(col(c).isNull(), c)).alias(c) for c in df_sample.columns
-    ]).show(truncate=False)
+    for c in df_sample.columns:
+        nulls = df_sample.select(count(when(col(c).isNull(), 1)).alias("nulls")).collect()[0][0]
+        print(f"{c}: {nulls}")
 
     print("\n=== 2️⃣ Статистика по числових стовпцях ===")
 
@@ -42,18 +42,15 @@ def analyze_dataset(df_trip: DataFrame):
         return
 
     # Обчислення базової статистики
-    stats_df = df_sample.select(
-        *[
-            expr
-            for c in numeric_cols
-            for expr in [
-                round(mean(col(c)), 2).alias(f"{c}_mean"),
-                round(min(col(c)), 2).alias(f"{c}_min"),
-                round(max(col(c)), 2).alias(f"{c}_max"),
-                round(stddev(col(c)), 2).alias(f"{c}_std")
-            ]
-        ]
-    )
+    aggs = []
+
+    for c in numeric_cols:
+        aggs.append(round(mean(col(c)), 2).alias(f"{c}_mean"))
+        aggs.append(round(min(col(c)), 2).alias(f"{c}_min"))
+        aggs.append(round(max(col(c)), 2).alias(f"{c}_max"))
+        aggs.append(round(stddev(col(c)), 2).alias(f"{c}_std"))
+
+    stats_df = df_sample.agg(*aggs)
 
     print("\n === Зведена статистика по числових колонках ===")
     stats_df.show(truncate=False)

@@ -16,6 +16,8 @@ trip_schema = StructType([
     StructField("on_scene_datetime", TimestampType(), True),
     StructField("pickup_datetime", TimestampType(), True),
     StructField("dropoff_datetime", TimestampType(), True),
+    StructField("PULocationID",LongType(),True),
+    StructField("DOLocationID",LongType(),True),
     StructField("trip_miles", DoubleType(), True),
     StructField("trip_time", LongType(), True),
     StructField("base_passenger_fare", DoubleType(), True),
@@ -33,7 +35,6 @@ trip_schema = StructType([
     # StructField("wav_match_flag", BinaryType(), True) NULL value in original table
 ])
 
-# Додаткові таблиці
 dispatch_base_schema = StructType([
     StructField("dispatch_base_num", StringType(), True)
 ])
@@ -43,13 +44,28 @@ origin_base_schema = StructType([
     StructField("origin_base_num", StringType(), True)
 ])
 
+'''
+    HV0002 - Juno
+    HV0003 - Uber
+    HV0004 - Via
+    HV0005 - Lyft
+'''
 vehicle_schema = StructType([
     StructField("hvfhs_license_num", StringType(), True)
 ])
 
+location_dim_schema = StructType([
+    StructField("LocationID", LongType(), True),
+    StructField("Borough", StringType(), True),
+    StructField("Zone", StringType(), True),
+    StructField("service_zone", StringType(), True)
+])
+
 
 def run_extracion(spark: SparkSession, input_path: str):
-
+    
+    df_location_dim = get_location_dim(spark, input_path)
+    
     path = Path(input_path)
     if not path.exists() or not path.is_dir():
         raise FileNotFoundError(f"Директорія не знайдена: {input_path}")
@@ -60,15 +76,14 @@ def run_extracion(spark: SparkSession, input_path: str):
 
     print(f"Знайдено {len(parquet_files)} parquet файлів. Починаємо зчитування...")
 
-    ### Обмеження даних з кожного parquet file по 10к з кожнго це буде 460к
-
+    # Зчитування csv файлу.
     df_trip = spark.read.schema(trip_schema).parquet(*[str(f) for f in parquet_files])
 
+    # Обмеження даних з кожного parquet file по 10к з кожнго це буде 460к
     limit_per_file = 10000
+
     limited = []
     for i,f in enumerate(parquet_files, start=1):
-        print(f"[{i}/{len(parquet_files)}] Зчитування {f.name} ...")
-
         part_of_df = (
             spark.read.schema(trip_schema).parquet(str(f)).limit(limit_per_file)
         )
@@ -90,7 +105,37 @@ def run_extracion(spark: SparkSession, input_path: str):
     print(f" - df_dispatch_base: {df_dispatch_base.count()} унікальних dispatching_base_num")
     print(f" - df_origin_base: {df_origin_base.count()} унікальних originating_base_num")
     print(f" - df_vehicle: {df_vehicle.count()} унікальних hvfhs_license_num")
+    print(f" - df_locations: {df_location_dim.count()} rows")
 
+    # Перевірка DataFrame
+    # dataframe_verification(df_trip,df_dispatch_base,df_origin_base,df_vehicle,df_location)
+
+    return df_trip, df_dispatch_base, df_origin_base, df_vehicle, df_location_dim
+
+def get_location_dim(spark: SparkSession, input_path: str):
+
+    path = Path(input_path)
+
+    csv_files = list(path.glob("*.csv"))
+    if not csv_files:
+        raise FileNotFoundError("❌ CSV файл з зонами не знайдено!")
+
+    print(f"\n Знайдено CSV файл: {csv_files[0].name}")
+
+    df_locations = (
+        spark.read
+        .option("header", True)
+        .schema(location_dim_schema)
+        .csv(str(csv_files[0]))
+        .distinct()
+    )
+
+    print("\n DIM таблиця локацій створена:")
+    # df_locations.show(5)
+
+    return df_locations
+
+def dataframe_verification(df_trip,df_dispatch_base,df_origin_base,df_vehicle,df_location):
     print("\nПеревірка DataFrames:")
     print("df_trip:")
     df_trip.select("hvfhs_license_num", "pickup_datetime", "trip_miles").show(5, truncate=False)
@@ -100,11 +145,12 @@ def run_extracion(spark: SparkSession, input_path: str):
     df_origin_base.show(5, truncate=False)
     print("df_vehicle:")
     df_vehicle.show(5, truncate=False)
+    print("df_location")
+    df_location.show(5,truncate=False)
 
     print("Перевірка типів колонок:")
     df_trip.printSchema()
     df_dispatch_base.printSchema()
     df_origin_base.printSchema()
     df_vehicle.printSchema()
-
-    return df_trip, df_dispatch_base, df_origin_base, df_vehicle
+    df_location.printSchema()
