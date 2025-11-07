@@ -20,7 +20,7 @@ def main():
     INPUT_DATA_PATH = '/app/data'
     OUTPUT_RESULT_DIR = ''
 
-    print("\nIniziliazate SparkSession\n")
+    print(f"\n {'='*15} Iniziliazate SparkSession {'='*15} \n")
 
     # Парамери, щоб уникати outofmemory
     spark = SparkSession.builder \
@@ -46,7 +46,7 @@ def main():
         '''
         # analyze_data = analyze_dataset(df_trip)
 
-        implementing_business_questions(df_trip, df_dispatch_base, df_origin_base, df_vehicle,df_location)
+        implementing_business_questions(spark, df_trip, df_dispatch_base, df_origin_base, df_vehicle, df_location)
 
     except Exception as e:
         print(f"\nПомилка виконання пайплайну: {e}")
