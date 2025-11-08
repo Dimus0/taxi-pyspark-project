@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import year, count, col,avg,rank,hour,month,lag,to_timestamp,create_map,lit,when,sum,round
+from pyspark.sql.functions import year, count, col,avg,rank,hour,month,lag,to_timestamp,create_map,lit,when,sum,round,row_number
 from pyspark.sql.window import Window
 import os
 
@@ -119,3 +119,129 @@ def implementing_business_questions(spark:SparkSession, df_trip, df_dispatch_bas
     print("\n Диспечерські бази які мають найдовші середні поїздки")
 
     longest_avg_trip.show(truncate=False)
+
+    # 7
+    print("\n7 Бізнес-питання")
+    print("Визначити години доби з найбільшою кількістю поїздок")
+
+    trips_by_hour = (
+        df_trip
+        .withColumn("hour", hour("pickup_datetime"))
+        .groupBy("hour")
+        .agg(count("*").alias("trip_count"))
+        .orderBy(col("trip_count").desc())
+        .limit(10)
+    )
+
+    trips_by_hour.show()
+
+
+    # 8
+    print("\n8 Бізнес-питання")
+    print("Яка компанія має найбільшу частку коротких поїздок (<1 милі) у 2021 році, і скільки їх було")
+
+    short_trip_share = (
+        df_trip
+        .filter((year("pickup_datetime") == 2021) & (col("trip_miles") > 0))
+        .withColumn("is_short", when(col("trip_miles") < 1, 1).otherwise(0))
+        .groupBy("hvfhs_license_num")
+        .agg(
+            sum("is_short").alias("short_trip_count"),
+            count("*").alias("total_trips"),
+            (sum("is_short") / count("*")).alias("short_trip_share")
+        )
+        .orderBy(col("short_trip_share").desc())
+    )
+    short_trip_share.show()
+
+
+    # 9
+    print("\n9 Бізнес-питання")
+    print("Топ-5 зон з найвищими середніми чайовими у 2022 році")
+
+    tips_by_zone = (
+        df_trip
+        .filter((year("pickup_datetime") == 2022) & (col("tips") > 0))
+        .join(
+            df_location.withColumnRenamed("LocationID", "PU_id"),
+            df_trip["PULocationID"] == col("PU_id"),
+            "left"
+        )
+        .groupBy("Zone")
+        .agg(avg("tips").alias("avg_tips"))
+        .orderBy(col("avg_tips").desc())
+        .limit(5)
+    )
+    tips_by_zone.show()
+
+
+    # 10
+    print("\n10 Бізнес-питання")
+    print("Визначити компанію з найбільшим зростанням середнього доходу з місяця в місяць")
+
+    w = Window.partitionBy("hvfhs_license_num").orderBy("year", "month")
+    w2 = Window.partitionBy("year", "month").orderBy(col("growth").desc())
+
+    fare_growth = (
+        df_trip
+        .filter(col("base_passenger_fare") > 0)
+        .withColumn("year", year("pickup_datetime"))
+        .withColumn("month", month("pickup_datetime"))
+        .groupBy("hvfhs_license_num", "year", "month")
+        .agg(avg("base_passenger_fare").alias("avg_fare"))
+        .withColumn("prev_avg_fare", lag("avg_fare").over(w))
+        .withColumn("growth", col("avg_fare") - col("prev_avg_fare"))
+        .withColumn("rank", row_number().over(w2))
+        .filter(col("rank") == 1)
+        .drop("rank")
+        .orderBy("year", "month")
+        .limit(12)
+    )
+
+    fare_growth.show()
+
+
+    # 11
+    print("\n11 Бізнес-питання")
+    print("Які бази мають найвищу середню оплату водіям, порівняно із середньою ціною поїздки")
+
+    pay_ratio = (
+        df_trip
+        .filter((col("driver_pay") > 0) & (col("base_passenger_fare") > 0))
+        .groupBy("dispatching_base_num")
+        .agg(
+            (avg("driver_pay") / avg("base_passenger_fare")).alias("driver_pay_ratio")
+        )
+        .orderBy(col("driver_pay_ratio").desc())
+        .limit(10)
+    )
+    pay_ratio.show()
+
+
+    # 12
+    print("\n12 Бізнес-питання (модифіковане)")
+    print("Визначити топ-5 районів з найбільшою середньою тривалістю поїздок")
+
+    borough_avg_duration = (
+        df_trip
+        .filter(col("trip_time") > 0)
+        .join(
+            df_location.withColumnRenamed("LocationID", "PU_id"),
+            df_trip["PULocationID"] == col("PU_id"),
+            "left"
+        )
+        .groupBy("Borough")
+        .agg(avg("trip_time").alias("avg_trip_time"))
+    )
+
+    w = Window.orderBy(col("avg_trip_time").desc())
+
+    top_boroughs = (
+        borough_avg_duration
+        .withColumn("rank", row_number().over(w))
+        .filter(col("rank") <= 5)
+        .drop("rank")
+    )
+
+    top_boroughs.show()
+
