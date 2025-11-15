@@ -63,10 +63,10 @@ trip_schema = StructType([
     StructField("trip_miles", DoubleType(), True),
     StructField("trip_time", LongType(), True),
     StructField("base_passenger_fare", DoubleType(), True),
-    StructField("tolls", DoubleType(), True),
+    # StructField("tolls", DoubleType(), True),
     StructField("bcf", DoubleType(), True),
     StructField("sales_tax", DoubleType(), True),
-    StructField("congestion_surcharge", DoubleType(), True),
+    # StructField("congestion_surcharge", DoubleType(), True),
     # StructField("airport_fee", LongType(), True), NULL value in original table
     StructField("tips", DoubleType(), True),
     StructField("driver_pay", DoubleType(), True),

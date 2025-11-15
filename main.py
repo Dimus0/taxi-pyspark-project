@@ -9,6 +9,7 @@ try:
     from functions.extraction import run_extracion
     from functions.data_analysis import analyze_dataset
     from functions.business_qeustion import implementing_business_questions
+    from functions.preprocessing import preprocess_for_ml
 except ImportError as e:
     print(f"Error imports module: {e}")
     sys.exit(1)
@@ -46,7 +47,13 @@ def main():
         '''
         # analyze_data = analyze_dataset(df_trip)
 
-        implementing_business_questions(spark, df_trip, df_dispatch_base, df_origin_base, df_vehicle, df_location)
+        # implementing_business_questions(spark, df_trip, df_dispatch_base, df_origin_base, df_vehicle, df_location)
+
+        print("\n Запуск preprocessing для ML...")
+        
+        df_ml = preprocess_for_ml(df_trip)
+
+        df_ml.show(5)
 
     except Exception as e:
         print(f"\nПомилка виконання пайплайну: {e}")
